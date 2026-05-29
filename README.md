@@ -6,12 +6,9 @@ A [Verus](https://github.com/verus-lang/verus) embedding of TLA+ temporal logic,
 
 The crate provides:
 
-- **`defs`** — `Execution`, `TempPred`, and the temporal connectives
-  (`always`, `eventually`, `leads_to`, `weak_fairness`, `valid`, `entails`,
-  `tla_forall`, `tla_exists`, `stable`, …).
-- **`rules`** — verified lemmas (modus ponens, weak-fairness,
-  induction, monotonicity, ESR, etc.) for proving liveness and safety
-  about state-transition systems.
+- **`defs`** — `Execution`, `TempPred`, and the temporal connectives (`always`, `eventually`, `leads_to`, `weak_fairness`, `valid`, `entails`, `tla_forall`, `tla_exists`, `stable`, …).
+- **`rules`** — verified TLA helper lemmas (modus ponens, weak-fairness, induction, monotonicity, ESR, etc.) for liveness and safety proofs.
+- **`state_machine`** — `Action`, `StateMachine`, and `NetworkStateMachine` structs for defining state-transition systems with preconditions, transitions, and weak-fairness assumptions.
 
 **Execution Model**
 
@@ -33,37 +30,18 @@ The `vstd` version must match the Verus toolchain you build with.
 
 ## Example
 
-Chaining two `leads_to` claims by transitivity:
-
-```rust
-use vstd::prelude::*;
-use verus_temporal_logic::defs::*;
-use verus_temporal_logic::rules::leads_to_trans;
-
-verus! {
-
-// Given `spec |= p ~> q` and `spec |= q ~> r`, conclude `spec |= p ~> r`.
-proof fn example<T>(spec: TempPred<T>, p: TempPred<T>, q: TempPred<T>, r: TempPred<T>)
-    requires
-        spec.entails(p.leads_to(q)),
-        spec.entails(q.leads_to(r)),
-    ensures
-        spec.entails(p.leads_to(r)),
-{
-    leads_to_trans(spec, p, q, r);
-}
-
-}
-```
-
-See [`src/rules.rs`](src/rules.rs) for the full set of lemmas.
+See [`src/mutex_example.rs`](src/mutex_example.rs).
 
 ## Build & verify
 
 This crate uses [`cargo verus`](https://github.com/verus-lang/verus).
 
 ```sh
-cargo verus verify --lib -- --rlimit 50 --time
+# Verify the library (defs + rules + state_machine)
+cargo verus verify --lib
+
+# Verify the mutex liveness example
+cargo verus verify --bin mutex_example
 ```
 
 ## License

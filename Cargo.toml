@@ -8,5 +8,9 @@ description = "A Verus embedding of TLA+ temporal logic, ported from the Anvil v
 [dependencies]
 vstd = "=0.0.0-2026-05-24-0157"
 
+[[bin]]
+name = "mutex_example"
+path = "src/mutex_example.rs"
+
 [package.metadata.verus]
 verify = true
