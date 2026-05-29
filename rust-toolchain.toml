@@ -1,0 +1,3 @@
+# Synchronized with the Verus version pinned by `vstd`.
+[toolchain]
+channel = "1.95.0"
