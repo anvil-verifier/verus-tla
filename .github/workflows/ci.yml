@@ -1,0 +1,68 @@
+name: Continuous integration
+run-name: Continuous integration run by ${{ github.actor }}
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - "README.md"
+      - ".gitignore"
+      - "doc/**"
+      - "LICENSE"
+  pull_request:
+  merge_group:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Discover the latest Verus release
+        id: verus-tag
+        run: |
+          TAG=$(curl -fsSL https://api.github.com/repos/verus-lang/verus/releases/latest \
+                | jq -r .tag_name | sed 's|^release/||')
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "Latest Verus release: $TAG"
+
+      - name: Cache toolchains
+        id: cache-toolchain
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo
+            ~/.rustup
+            ~/verus
+          key: toolchain-${{ runner.os }}-${{ steps.verus-tag.outputs.tag }}-${{ hashFiles('rust-toolchain.toml') }}
+
+      - name: Install Rust if cache is missing
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" \
+            | sh -s -- --default-toolchain none -y
+          . "$HOME/.cargo/env"
+          rustup toolchain install
+
+      - name: Download Verus if cache is missing
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          TAG="${{ steps.verus-tag.outputs.tag }}"
+          curl -fsSL -o /tmp/verus.zip \
+            "https://github.com/verus-lang/verus/releases/download/release%2F${TAG}/verus-${TAG}-x86-linux.zip"
+          unzip -q /tmp/verus.zip -d "$HOME"
+          mv "$HOME/verus-x86-linux" "$HOME/verus"
+          rm /tmp/verus.zip
+
+      - name: Seed cargo registry
+        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+        run: |
+          . "$HOME/.cargo/env"
+          cargo fetch
+
+      - name: Verify temporal logic library
+        run: |
+          . "$HOME/.cargo/env"
+          export PATH="$PATH:$HOME/verus"
+          cargo verus focus --lib -- --rlimit 50 --time
