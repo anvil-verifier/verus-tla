@@ -29,13 +29,7 @@ vstd = "=0.0.0-2026-05-24-0157"
 verus_temporal_logic = { git = "https://github.com/anvil-verifier/Verus-TLA-embedding" }
 ```
 
-```rust
-use verus_temporal_logic::defs::*;
-use verus_temporal_logic::rules::*;
-```
-
-The `vstd` version must match the Verus toolchain you build with;
-this crate pins it because Verus pre-releases break frequently.
+The `vstd` version must match the Verus toolchain you build with.
 
 ## Example
 
