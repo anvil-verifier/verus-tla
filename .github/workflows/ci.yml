@@ -13,53 +13,33 @@ on:
   merge_group:
   workflow_dispatch:
 
+env:
+  # Pin Verus to the release whose date matches the vstd version in
+  # Cargo.toml (=0.0.0-2026-05-24-0157). Bump both together. The tag
+  # also includes a short commit hash; see:
+  # https://github.com/verus-lang/verus/releases
+  VERUS_TAG: "0.2026.05.24.ecee80a"
+
 jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
 
-      - name: Discover the latest Verus release
-        id: verus-tag
-        run: |
-          TAG=$(curl -fsSL https://api.github.com/repos/verus-lang/verus/releases/latest \
-                | jq -r .tag_name | sed 's|^release/||')
-          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Latest Verus release: $TAG"
-
-      - name: Cache toolchains
-        id: cache-toolchain
-        uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo
-            ~/.rustup
-            ~/verus
-          key: toolchain-${{ runner.os }}-${{ steps.verus-tag.outputs.tag }}-${{ hashFiles('rust-toolchain.toml') }}
-
-      - name: Install Rust if cache is missing
-        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+      - name: Install Rust
         run: |
           curl --proto '=https' --tlsv1.2 --retry 10 --retry-connrefused -fsSL "https://sh.rustup.rs" \
             | sh -s -- --default-toolchain none -y
           . "$HOME/.cargo/env"
           rustup toolchain install
 
-      - name: Download Verus if cache is missing
-        if: steps.cache-toolchain.outputs.cache-hit != 'true'
+      - name: Download Verus
         run: |
-          TAG="${{ steps.verus-tag.outputs.tag }}"
           curl -fsSL -o /tmp/verus.zip \
-            "https://github.com/verus-lang/verus/releases/download/release%2F${TAG}/verus-${TAG}-x86-linux.zip"
+            "https://github.com/verus-lang/verus/releases/download/release%2F${VERUS_TAG}/verus-${VERUS_TAG}-x86-linux.zip"
           unzip -q /tmp/verus.zip -d "$HOME"
           mv "$HOME/verus-x86-linux" "$HOME/verus"
           rm /tmp/verus.zip
-
-      - name: Seed cargo registry
-        if: steps.cache-toolchain.outputs.cache-hit != 'true'
-        run: |
-          . "$HOME/.cargo/env"
-          cargo fetch
 
       - name: Verify temporal logic library
         run: |
