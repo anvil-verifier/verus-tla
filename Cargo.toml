@@ -6,7 +6,7 @@ license = "MIT"
 description = "A Verus embedding of TLA+ temporal logic, ported from the Anvil verifier."
 
 [dependencies]
-vstd = "=0.0.0-2026-05-24-0157"
+vstd = "=0.0.0-2026-05-31-0205"
 
 [[bin]]
 name = "mutex_example"
