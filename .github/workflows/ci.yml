@@ -16,7 +16,7 @@ on:
 env:
   # should match vstd version in Cargo.toml
   # https://github.com/verus-lang/verus/releases
-  VERUS_TAG: "0.2026.06.16.95f26de"
+  VERUS_TAG: "0.2026.06.14.4ea7d0f"
 
 jobs:
   verify:
