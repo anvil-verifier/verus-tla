@@ -1,3 +1,4 @@
+#![allow(unused_features)]
 // Copyright 2022 VMware, Inc.
 // SPDX-License-Identifier: MIT
 pub mod defs;

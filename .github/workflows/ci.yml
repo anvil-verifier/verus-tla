@@ -14,11 +14,9 @@ on:
   workflow_dispatch:
 
 env:
-  # Pin Verus to the release whose date matches the vstd version in
-  # Cargo.toml (=0.0.0-2026-05-24-0157). Bump both together. The tag
-  # also includes a short commit hash; see:
+  # should match vstd version in Cargo.toml
   # https://github.com/verus-lang/verus/releases
-  VERUS_TAG: "0.2026.05.24.ecee80a"
+  VERUS_TAG: "0.2026.06.14.4ea7d0f"
 
 jobs:
   verify:
