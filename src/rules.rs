@@ -2017,6 +2017,31 @@ macro_rules! or_leads_to_n_internal {
 pub use or_leads_to_n;
 pub use or_leads_to_n_internal;
 
+// result leads to q
+// The 'result' is the equivalent temporal predicate of joining all following predicates with \/.
+// pre:
+//     result == p1 \/ p2 \/ ... \/ pn
+//     spec |= p1 ~> q
+//     spec |= p2 ~> q
+//         ...
+//     spec |= pn ~> q
+// post:
+//     spec |= result ~> q
+//
+// Usage: or_leads_to_combine_and_equality!(spec, result, p1, p2, p3; q)
+#[macro_export]
+macro_rules! or_leads_to_combine_and_equality {
+    ($spec:expr, $result:expr, $p1:expr, $($rest:expr),+; $q:expr) => {
+        temp_pred_equality(
+            $result,
+            $p1$(.or($rest))+
+        );
+        or_leads_to_n!($spec, $p1, $($rest),+; $q);
+    }
+}
+
+pub use or_leads_to_combine_and_equality;
+
 // Leads to the conjunction of all the []q if leads to each of them.
 // pre:
 //     spec |= p ~> []q1
