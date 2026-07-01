@@ -195,6 +195,25 @@ pub proof fn vacuous_implies<T>(spec: TempPred<T>, p: TempPred<T>, q: TempPred<T
     };
 }
 
+// modus ponens
+// pre:
+//     spec |= p => q
+//     spec |= p
+// post:
+//     spec |= q
+pub proof fn implies_apply<T>(spec: TempPred<T>, p: TempPred<T>, q: TempPred<T>)
+    requires
+        spec.entails(p.implies(q)),
+        spec.entails(p),
+    ensures spec.entails(q),
+{
+    assert forall |ex| spec.satisfied_by(ex) implies #[trigger] q.satisfied_by(ex) by {
+        implies_apply_ex::<T>(ex, spec, p);
+        implies_apply_ex::<T>(ex, spec, p.implies(q));
+        implies_apply_ex::<T>(ex, p, q);
+    };
+}
+
 proof fn always_distributed_by_and<T>(p: TempPred<T>, q: TempPred<T>)
     ensures valid(always(p.and(q)).implies(always(p).and(always(q)))),
 {
