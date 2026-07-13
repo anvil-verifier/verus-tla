@@ -22,7 +22,7 @@ pub struct Execution<T> {
 
 ```toml
 [dependencies]
-vstd = "=0.0.0-2026-06-14-0213"
+vstd = "=0.0.0-2026-07-12-0122"
 verus_temporal_logic = { git = "https://github.com/anvil-verifier/Verus-TLA-embedding" }
 ```
 
