@@ -16,7 +16,9 @@ on:
 env:
   # should match vstd version in Cargo.toml
   # https://github.com/verus-lang/verus/releases
-  VERUS_TAG: "0.2026.07.13.6571723"
+  # Use a durable (non-rolling) release tag: rolling releases are deleted
+  # over time, which breaks the download URL.
+  VERUS_TAG: "0.2026.07.12.0b42f4c"
 
 jobs:
   verify:
@@ -34,7 +36,7 @@ jobs:
       - name: Download Verus
         run: |
           curl -fsSL -o /tmp/verus.zip \
-            "https://github.com/verus-lang/verus/releases/download/release/rolling/${VERUS_TAG}/verus-${VERUS_TAG}-x86-linux.zip"
+            "https://github.com/verus-lang/verus/releases/download/release%2F${VERUS_TAG}/verus-${VERUS_TAG}-x86-linux.zip"
           unzip -q /tmp/verus.zip -d "$HOME"
           mv "$HOME/verus-x86-linux" "$HOME/verus"
           rm /tmp/verus.zip
