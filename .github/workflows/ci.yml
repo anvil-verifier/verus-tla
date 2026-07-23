@@ -16,7 +16,9 @@ on:
 env:
   # should match vstd version in Cargo.toml
   # https://github.com/verus-lang/verus/releases
-  VERUS_TAG: "0.2026.06.14.4ea7d0f"
+  # Use a durable (non-rolling) release tag: rolling releases are deleted
+  # over time, which breaks the download URL.
+  VERUS_TAG: "0.2026.07.12.0b42f4c"
 
 jobs:
   verify:
