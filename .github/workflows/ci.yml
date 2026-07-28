@@ -12,19 +12,20 @@ on:
   pull_request:
   merge_group:
   workflow_dispatch:
-
-env:
-  # should match vstd version in Cargo.toml
-  # https://github.com/verus-lang/verus/releases
-  # Use a durable (non-rolling) release tag: rolling releases are deleted
-  # over time, which breaks the download URL.
-  VERUS_TAG: "0.2026.07.12.0b42f4c"
+  schedule:
+    - cron: "0 7 * * *" # Catch breakage from upstream Verus `main`
 
 jobs:
   verify:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+
+      - name: Checkout Verus (latest main)
+        uses: actions/checkout@v4
+        with:
+          repository: verus-lang/verus
+          path: verus-src
 
       - name: Install Rust
         run: |
@@ -33,16 +34,17 @@ jobs:
           . "$HOME/.cargo/env"
           rustup toolchain install
 
-      - name: Download Verus
+      - name: Build Verus
         run: |
-          curl -fsSL -o /tmp/verus.zip \
-            "https://github.com/verus-lang/verus/releases/download/release%2F${VERUS_TAG}/verus-${VERUS_TAG}-x86-linux.zip"
-          unzip -q /tmp/verus.zip -d "$HOME"
-          mv "$HOME/verus-x86-linux" "$HOME/verus"
-          rm /tmp/verus.zip
+          . "$HOME/.cargo/env"
+          cd verus-src/source
+          ./tools/get-z3.sh
+          source ../tools/activate
+          vargo build --release
+          mv target-verus/release "$HOME/verus"
 
       - name: Verify temporal logic library
         run: |
           . "$HOME/.cargo/env"
           export PATH="$PATH:$HOME/verus"
-          cargo verus verify --lib -- --rlimit 50 --time
+          cargo verus focus --lib -- --time
