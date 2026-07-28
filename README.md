@@ -1,6 +1,6 @@
 # verus_temporal_logic
 
-[![CI](https://github.com/anvil-verifier/Verus-TLA-embedding/actions/workflows/ci.yml/badge.svg)](https://github.com/anvil-verifier/Verus-TLA-embedding/actions/workflows/ci.yml)
+[![CI](https://github.com/anvil-verifier/verus-tla/actions/workflows/ci.yml/badge.svg)](https://github.com/anvil-verifier/verus-tla/actions/workflows/ci.yml)
 
 A [Verus](https://github.com/verus-lang/verus) embedding of TLA+ temporal logic, ported from [Anvil](https://github.com/anvil-verifier/anvil).
 
@@ -22,11 +22,11 @@ pub struct Execution<T> {
 
 ```toml
 [dependencies]
-vstd = "=0.0.0-2026-07-12-0122"
-verus_temporal_logic = { git = "https://github.com/anvil-verifier/Verus-TLA-embedding" }
+vstd = { git = "https://github.com/verus-lang/verus.git" }
+verus_temporal_logic = { git = "https://github.com/anvil-verifier/verus-tla" }
 ```
 
-The `vstd` version must match the Verus toolchain you build with.
+Build your local Verus binary following instructions in [`BUILD.md`](https://github.com/verus-lang/verus/blob/main/BUILD.md) off the `main` branch of Verus.
 
 ## Example
 
