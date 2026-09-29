@@ -1,8 +1,8 @@
-# verus_temporal_logic
+# Verus-TLA
 
 [![CI](https://github.com/anvil-verifier/verus-tla/actions/workflows/ci.yml/badge.svg)](https://github.com/anvil-verifier/verus-tla/actions/workflows/ci.yml)
 
-A [Verus](https://github.com/verus-lang/verus) embedding of TLA+ temporal logic, ported from [Anvil](https://github.com/anvil-verifier/anvil).
+A [Verus](https://github.com/verus-lang/verus) embedding of TLA (Temporal Logic of Actions), ported from [Anvil](https://github.com/anvil-verifier/anvil).
 
 The crate provides:
 
@@ -26,7 +26,7 @@ vstd = { git = "https://github.com/verus-lang/verus.git" }
 verus_temporal_logic = { git = "https://github.com/anvil-verifier/verus-tla" }
 ```
 
-Build your local Verus binary following instructions in [`BUILD.md`](https://github.com/verus-lang/verus/blob/main/BUILD.md) off the `main` branch of Verus.
+Build your local Verus binary following the instructions in [`BUILD.md`](https://github.com/verus-lang/verus/blob/main/BUILD.md) from the `main` branch of Verus.
 
 ## Example
 
