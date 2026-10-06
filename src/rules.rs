@@ -2170,6 +2170,7 @@ proof fn eventually_always_tla_forall_apply_ex<T, A>(ex: Execution<T>, a_to_p: s
 
 // domain maps state to a finite set
 #[verifier(spinoff_prover)]
+#[verifier::rlimit(30)]
 pub proof fn spec_entails_eventually_always_within_dynamic_finite_domain<T, A>(
     spec: TempPred<T>, next: ActionPred<T>, a_to_p: spec_fn(A) -> StatePred<T>, domain: spec_fn(T) -> Set<A>
 )
