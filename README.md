@@ -30,7 +30,7 @@ Build your local Verus binary following the instructions in [`BUILD.md`](https:/
 
 ## Example
 
-See [`src/mutex_example.rs`](src/mutex_example.rs).
+See [`src/mutex_example.rs`](src/mutex_example.rs) and [proofs](https://github.com/anvil-verifier/anvil/blob/main/src/controllers/vdeployment_controller/proof/liveness/rolling_update/composition.rs) in Anvil.
 
 ## Build & verify
 
