@@ -3208,8 +3208,6 @@ pub broadcast proof fn valid_implies_entails_always<T>(spec: TempPred<T>, p: Tem
 }
 
 // Necessitation as an equivalence on validity.
-// Not in group_tla_rules: as a default rule it made a heavy Anvil proof (vstatefulset guarantee_condition_holds)
-// run until its rlimit, so `broadcast use valid_always_equality;` it where needed.
 // post:
 //     |= []p <==> |= p
 pub broadcast proof fn valid_always_equality<T>(p: TempPred<T>)
@@ -3495,6 +3493,7 @@ pub broadcast group group_tla_equality_rules {
 // always: invariants and necessitation.
 pub broadcast group group_tla_safety_rules {
     valid_implies_entails_always,
+    valid_always_equality,
     always_double_equality,
     always_and_equality,
     entails_preserved_by_always,
