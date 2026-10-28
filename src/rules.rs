@@ -3504,7 +3504,8 @@ pub broadcast group group_tla_equality_rules {
 
 // TLA Lemmas on coalesced operators. 
 // lemmas that need a witness must still be called explicitly.
-// They are grouped by the operator, and broadcast by default
+// They are grouped by the operator and are not used by default: `broadcast use group_tla_rules;`
+// (or a single group) in the module or proof that needs them
 
 // always: invariants and necessitation.
 pub broadcast group group_tla_safety_rules {
@@ -3583,7 +3584,7 @@ pub broadcast group group_tla_exists_rules {
     leads_to_exists_pointwise,
 }
 
-#[verifier::broadcast_use_by_default_when_this_crate_is_imported]
+// Usage: broadcast use group_tla_rules; (or one of the groups above)
 pub broadcast group group_tla_rules {
     group_tla_safety_rules,
     group_tla_later_rules,

@@ -14,6 +14,8 @@ use vstd::prelude::*;
 
 verus! {
 
+broadcast use group_tla_rules;
+
 enum Tid { A, B }
 
 enum ThreadState { Waiting, Holding, Terminated }
