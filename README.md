@@ -7,7 +7,7 @@ A [Verus](https://github.com/verus-lang/verus) embedding of TLA (Temporal Logic 
 The crate provides:
 
 - **`defs`** — `Execution`, `TempPred`, and the temporal connectives (`always`, `eventually`, `leads_to`, `weak_fairness`, `valid`, `entails`, `tla_forall`, `tla_exists`, `stable`, …).
-- **`rules`** — verified TLA helper lemmas (modus ponens, weak-fairness, induction, monotonicity, ESR, etc.) for liveness and safety proofs.
+- **`rules`** — verified TLA helper lemmas (modus ponens, weak-fairness, induction, monotonicity, ESR, etc.) for liveness and safety proofs. The broadcast lemma groups are listed at the end of [`src/rules.rs`](src/rules.rs), including an all-in-one `group_tla_rules` and specific groups for different theorems(e.g. `group_tla_safety_rules`).
 - **`state_machine`** — `Action`, `StateMachine`, and `NetworkStateMachine` structs for defining state-transition systems with preconditions, transitions, and weak-fairness assumptions.
 
 **Execution Model**
