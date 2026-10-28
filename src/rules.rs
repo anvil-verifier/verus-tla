@@ -1795,6 +1795,22 @@ pub proof fn always_weaken<T>(spec: TempPred<T>, p: TempPred<T>, q: TempPred<T>)
     };
 }
 
+// Weaken an invariant by a state-level implication. Broadcast: it fires on a pair of invariants
+// spec |= []p and spec |= []q that are both already terms.
+// pre:
+//     forall s. p(s) ==> q(s)
+//     spec |= []p
+// post:
+//     spec |= []q
+pub broadcast proof fn always_lift_state_weaken<T>(spec: TempPred<T>, p: StatePred<T>, q: StatePred<T>)
+    requires
+        forall |s: T| #[trigger] p(s) ==> q(s),
+        spec.entails(always(lift_state(p))),
+    ensures #![trigger spec.entails(always(lift_state(p))), spec.entails(always(lift_state(q)))] spec.entails(always(lift_state(q))),
+{
+    always_weaken(spec, lift_state(p), lift_state(q));
+}
+
 // Introduce always to both sides of always implies.
 // pre:
 //     spec |= [](p => q)
@@ -3494,6 +3510,7 @@ pub broadcast group group_tla_equality_rules {
 pub broadcast group group_tla_safety_rules {
     valid_implies_entails_always,
     valid_always_equality,
+    always_lift_state_weaken,
     always_double_equality,
     always_and_equality,
     entails_preserved_by_always,
