@@ -7,6 +7,8 @@ use vstd::prelude::*;
 
 verus! {
 
+broadcast use group_tla_rules;
+
 #[verifier(reject_recursive_types(State))]
 #[verifier(reject_recursive_types(Input))]
 #[verifier(reject_recursive_types(Output))]

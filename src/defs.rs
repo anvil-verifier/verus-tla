@@ -30,6 +30,7 @@ pub type StatePred<T> = spec_fn(T) -> bool;
 pub type ActionPred<T> = spec_fn(T, T) -> bool;
 
 #[verifier(reject_recursive_types(T))]
+#[verifier::ext_equal]
 pub struct TempPred<T> {
     pub pred: spec_fn(Execution<T>) -> bool,
 }
@@ -67,6 +68,7 @@ impl<T> TempPred<T> {
     // iff it is always the case that `self` getting satisfied implies `other` eventually getting satisfied.
     //
     // Defined in 3.2.3.
+    #[verifier::opaque]
     pub open spec fn leads_to(self, other: Self) -> Self {
         always(self.implies(eventually(other)))
     }
@@ -93,6 +95,7 @@ pub open spec fn lift_action<T>(action_pred: ActionPred<T>) -> TempPred<T> {
 // Returns a temporal predicate that is satisfied iff `temp_pred` is satisfied on every suffix of the execution.
 //
 // Defined in 3.1.
+#[verifier::opaque]
 pub open spec fn always<T>(temp_pred: TempPred<T>) -> TempPred<T> {
     TempPred::new(|ex: Execution<T>| forall |i: nat| #[trigger] temp_pred.satisfied_by(ex.suffix(i)))
 }
@@ -101,12 +104,14 @@ pub open spec fn always<T>(temp_pred: TempPred<T>) -> TempPred<T> {
 // Returns a temporal predicate that is satisfied iff `temp_pred` is satisfied on at least one suffix of the execution.
 //
 // Defined in 3.2.1.
+#[verifier::opaque]
 pub open spec fn eventually<T>(temp_pred: TempPred<T>) -> TempPred<T> {
     TempPred::new(|ex: Execution<T>| exists |i: nat| #[trigger] temp_pred.satisfied_by(ex.suffix(i)))
 }
 
 // `'` (prime) for temporal predicates in TLA+.
 // Returns a temporal predicate that is satisfied iff `temp_pred` is satisfied on the suffix execution starting from the next state.
+#[verifier::opaque]
 pub open spec fn later<T>(temp_pred: TempPred<T>) -> TempPred<T> {
     TempPred::new(|ex: Execution<T>| temp_pred.satisfied_by(ex.suffix(1)))
 }
@@ -126,6 +131,7 @@ pub open spec fn tla_exists<T, A>(a_to_temp_pred: spec_fn(A) -> TempPred<T>) -> 
     TempPred::new(|ex: Execution<T>| exists |a: A| #[trigger] a_to_temp_pred(a).satisfied_by(ex))
 }
 
+#[verifier::opaque]
 pub open spec fn stable<T>(temp_pred: TempPred<T>) -> TempPred<T> {
     TempPred::new(|ex: Execution<T>| temp_pred.implies(always(temp_pred)).satisfied_by(ex))
 }
@@ -155,6 +161,7 @@ pub open spec fn enabled<T>(action_pred: ActionPred<T>) -> StatePred<T> {
 // == []<>(~E(A) \/ A)      <--- apply eventually_or
 // == []<>~E(A) \/ []<>A    <--- apply always_eventually_distrib
 // == []<>A \/ []<>~E(A)
+#[verifier::opaque]
 pub open spec fn weak_fairness<T>(action_pred: ActionPred<T>) -> TempPred<T> {
     always(lift_state(enabled(action_pred))).leads_to(lift_action(action_pred))
 }
@@ -173,6 +180,55 @@ pub open spec fn true_pred<T>() -> TempPred<T> {
 
 pub open spec fn false_pred<T>() -> TempPred<T> {
     not(true_pred())
+}
+
+// The temporal operators above are coalesced, which means reasonings using the logic does not require
+// revealing the encoding in FOL, while the soundness is checked by SMT solvers
+
+pub(crate) broadcast proof fn always_unfold<T>(ex: Execution<T>, p: TempPred<T>)
+    ensures #[trigger] always(p).satisfied_by(ex) <==> forall |i: nat| #[trigger] p.satisfied_by(ex.suffix(i)),
+{
+    reveal(always);
+}
+
+pub(crate) broadcast proof fn eventually_unfold<T>(ex: Execution<T>, p: TempPred<T>)
+    ensures #[trigger] eventually(p).satisfied_by(ex) <==> exists |i: nat| #[trigger] p.satisfied_by(ex.suffix(i)),
+{
+    reveal(eventually);
+}
+
+pub(crate) broadcast proof fn later_unfold<T>(ex: Execution<T>, p: TempPred<T>)
+    ensures #[trigger] later(p).satisfied_by(ex) <==> p.satisfied_by(ex.suffix(1)),
+{
+    reveal(later);
+}
+
+pub broadcast proof fn leads_to_unfold<T>(p: TempPred<T>, q: TempPred<T>)
+    ensures #[trigger] p.leads_to(q) == always(p.implies(eventually(q))),
+{
+    reveal(TempPred::leads_to);
+}
+
+pub broadcast proof fn stable_unfold<T>(p: TempPred<T>)
+    ensures #[trigger] stable(p) == p.implies(always(p)),
+{
+    reveal(stable);
+    assert(stable(p).pred =~= p.implies(always(p)).pred);
+}
+
+pub broadcast proof fn weak_fairness_unfold<T>(action_pred: ActionPred<T>)
+    ensures #[trigger] weak_fairness(action_pred) == always(lift_state(enabled(action_pred))).leads_to(lift_action(action_pred)),
+{
+    reveal(weak_fairness);
+}
+
+pub(crate) broadcast group group_tla_semantics {
+    always_unfold,
+    eventually_unfold,
+    later_unfold,
+    leads_to_unfold,
+    stable_unfold,
+    weak_fairness_unfold,
 }
 
 }
