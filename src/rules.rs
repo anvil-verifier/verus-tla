@@ -3073,4 +3073,109 @@ pub proof fn iterative_esr<T>(spec: TempPred<T>, p: spec_fn(nat) -> TempPred<T>,
     }
 }
 
+// Unfold can_enable by one next step.
+// post:
+//     can_enable(next, a)(s) <==> enabled(next /\ a)(s) \/ (exists |u| next(s, u) /\ can_enable(next, a)(u))
+pub proof fn can_enable_unfold<T>(next: ActionPred<T>, a: ActionPred<T>, s: T)
+    ensures
+        can_enable(next, a)(s) <==> (enabled(|s: T, s_prime: T| next(s, s_prime) && a(s, s_prime))(s) || exists |u: T| #[trigger] next(s, u) && can_enable(next, a)(u)),
+{
+    let next_and_a = |s: T, s_prime: T| next(s, s_prime) && a(s, s_prime);
+    let steps_then_a = action_compose(action_star(next), next_and_a);
+    if can_enable(next, a)(s) {
+        // After k next steps from s, the system is at u where the action is enabled.
+        let t = choose |t: T| #[trigger] steps_then_a(s, t);
+        let u = choose |u: T| #[trigger] action_star(next)(s, u) && next_and_a(u, t);
+        let k = choose |k: nat| #[trigger] action_repeat(next, k)(s, u);
+        if k == 0 {
+            assert(next_and_a(s, t));
+        } else {
+            // The first of the k next steps goes to w, and next can still enable the action at w.
+            let w = choose |w: T| #[trigger] next(s, w) && action_repeat(next, (k - 1) as nat)(w, u);
+            assert(action_star(next)(w, u));
+            assert(steps_then_a(w, t));
+        }
+    }
+    if enabled(next_and_a)(s) {
+        let t = choose |t: T| #[trigger] next_and_a(s, t);
+        assert(action_repeat(next, 0)(s, s));
+        assert(action_star(next)(s, s));
+        assert(steps_then_a(s, t));
+    }
+    if exists |w: T| #[trigger] next(s, w) && can_enable(next, a)(w) {
+        let w = choose |w: T| #[trigger] next(s, w) && can_enable(next, a)(w);
+        let t = choose |t: T| #[trigger] steps_then_a(w, t);
+        let u = choose |u: T| #[trigger] action_star(next)(w, u) && next_and_a(u, t);
+        let k = choose |k: nat| #[trigger] action_repeat(next, k)(w, u);
+        assert(action_repeat(next, k + 1)(s, u));
+        assert(action_star(next)(s, u));
+        assert(steps_then_a(s, t));
+    }
+}
+
+// Hyperfairness implies strong fairness.
+// pre:
+//     forall |s, s_prime| a(s, s_prime) ==> next(s, s_prime)
+// post:
+//     |= HF(next, a) => SF(a)
+pub proof fn hyperfairness_implies_strong_fairness<T>(next: ActionPred<T>, a: ActionPred<T>)
+    requires forall |s: T, s_prime: T| #[trigger] a(s, s_prime) ==> next(s, s_prime),
+    ensures valid(hyperfairness(next, a).implies(strong_fairness(a))),
+{
+    let next_and_a = |s: T, s_prime: T| next(s, s_prime) && a(s, s_prime);
+    assert forall |ex| #[trigger] hyperfairness(next, a).implies(strong_fairness(a)).satisfied_by(ex) by {
+        if hyperfairness(next, a).satisfied_by(ex) && always(eventually(lift_state(enabled(a)))).satisfied_by(ex) {
+            assert forall |i: nat| #[trigger] eventually(lift_state(can_enable(next, a))).satisfied_by(ex.suffix(i)) by {
+                // The action is enabled at some later state s, so next can enable it at s with zero steps.
+                always_unfold_ex::<T>(ex, eventually(lift_state(enabled(a))));
+                let j = eventually_choose_witness_ex::<T>(ex.suffix(i), lift_state(enabled(a)));
+                let s = ex.suffix(i).suffix(j).head();
+                assert(enabled(a)(s));
+                let t = choose |t: T| #[trigger] a(s, t);
+                assert(action_repeat(next, 0)(s, s));
+                assert(action_star(next)(s, s));
+                assert(action_compose(action_star(next), next_and_a)(s, t));
+                eventually_intro_by_witness_ex::<T>(ex.suffix(i), lift_state(can_enable(next, a)), j);
+            }
+        }
+    }
+}
+
+// Get the initial leads_to with hyperfairness.
+// Unlike wf1, forward does not have to be enabled when p holds.
+// pre:
+//     |= p /\ next => p' \/ q'
+//     |= p /\ next /\ forward => q'
+//     |= p => can_enable(next, forward)
+//     spec |= []next
+//     spec |= HF(next, forward)
+// post:
+//     spec |= p ~> q
+pub proof fn hf1<T>(spec: TempPred<T>, next: ActionPred<T>, forward: ActionPred<T>, p: StatePred<T>, q: StatePred<T>)
+    requires
+        forall |s, s_prime: T| p(s) && #[trigger] next(s, s_prime) ==> p(s_prime) || q(s_prime),
+        forall |s, s_prime: T| p(s) && #[trigger] next(s, s_prime) && forward(s, s_prime) ==> q(s_prime),
+        forall |s: T| #[trigger] p(s) ==> can_enable(next, forward)(s),
+        spec.entails(always(lift_action(next))),
+        spec.entails(hyperfairness(next, forward)),
+    ensures spec.entails(lift_state(p).leads_to(lift_state(q))),
+{
+    assert forall |ex| #[trigger] spec.satisfied_by(ex) implies always(lift_state(p)).leads_to(lift_action(forward)).satisfied_by(ex) by {
+        assert forall |i: nat| #[trigger] always(lift_state(p)).satisfied_by(ex.suffix(i)) implies eventually(lift_action(forward)).satisfied_by(ex.suffix(i)) by {
+            // p holds from i on and next can enable forward whenever p holds, so next can enable forward infinitely often.
+            assert forall |k: nat| #[trigger] eventually(lift_state(can_enable(next, forward))).satisfied_by(ex.suffix(k)) by {
+                let m = if k <= i { (i - k) as nat } else { 0 };
+                let j = if k <= i { 0 } else { (k - i) as nat };
+                always_unfold_ex::<T>(ex.suffix(i), lift_state(p));
+                execution_equality::<T>(ex.suffix(k).suffix(m), ex.suffix(i).suffix(j));
+                eventually_intro_by_witness_ex::<T>(ex.suffix(k), lift_state(can_enable(next, forward)), m);
+            }
+            // Then hyperfairness says that forward happens infinitely often.
+            implies_apply_ex::<T>(ex, spec, hyperfairness(next, forward));
+            always_unfold_ex::<T>(ex, eventually(lift_action(forward)));
+        }
+    }
+    wf1_variant::<T>(spec, lift_action(next), lift_action(forward), lift_state(p), lift_state(q));
+}
+
 }

@@ -30,7 +30,7 @@ Build your local Verus binary following the instructions in [`BUILD.md`](https:/
 
 ## Example
 
-See [`src/mutex_example.rs`](src/mutex_example.rs) and [proofs](https://github.com/anvil-verifier/anvil/blob/main/src/controllers/vdeployment_controller/proof/liveness/rolling_update/composition.rs) in Anvil.
+See [`src/mutex_example.rs`](src/mutex_example.rs), [`src/resource_version_example.rs`](src/resource_version_example.rs), and [proofs](https://github.com/anvil-verifier/anvil/blob/main/src/controllers/vdeployment_controller/proof/liveness/rolling_update/composition.rs) in Anvil.
 
 ## Build & verify
 
@@ -40,8 +40,9 @@ This crate uses [`cargo verus`](https://github.com/verus-lang/verus).
 # Verify the library (defs + rules + state_machine)
 cargo verus verify --lib
 
-# Verify the mutex liveness example
-cargo verus verify --bin mutex_example
+# Verify the examples
+cargo verus verify --bin [EXAMPLE]
+# EXAMPLE := mutex_example | resource_version_example
 ```
 
 ## License

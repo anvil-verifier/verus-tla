@@ -159,6 +159,66 @@ pub open spec fn weak_fairness<T>(action_pred: ActionPred<T>) -> TempPred<T> {
     always(lift_state(enabled(action_pred))).leads_to(lift_action(action_pred))
 }
 
+// `⋅` for actions in TLA+.
+// Returns an action predicate that is satisfied iff an `a` step followed by a `b` step leads from the current state to the next state.
+pub open spec fn action_compose<T>(a: ActionPred<T>, b: ActionPred<T>) -> ActionPred<T> {
+    |s: T, s_prime: T| exists |u: T| #[trigger] a(s, u) && b(u, s_prime)
+}
+
+// Returns an action predicate that is satisfied iff exactly `k` `a` steps lead from the current state to the next state.
+pub open spec fn action_repeat<T>(a: ActionPred<T>, k: nat) -> ActionPred<T>
+    decreases k,
+{
+    if k == 0 {
+        |s: T, s_prime: T| s_prime == s
+    } else {
+        action_compose(a, action_repeat(a, (k - 1) as nat))
+    }
+}
+
+// Returns an action predicate that is satisfied iff any finite number of `a` steps (possibly zero) lead from the current state to the next state.
+pub open spec fn action_star<T>(a: ActionPred<T>) -> ActionPred<T> {
+    |s: T, s_prime: T| exists |k: nat| #[trigger] action_repeat(a, k)(s, s_prime)
+}
+
+// Returns a state predicate that is satisfied
+// iff any finite number of `next` steps can lead from the current state to a state where `action_pred` is enabled.
+//
+// can_enable() is used for checking whether the system can make a particular action enabled from this **state**
+//
+// Note: it says whether the action *can possibly* get enabled, rather than whether the action *actually does* get enabled!
+// `next` should be exactly the next-state relation of the system, because a looser `next` can enable more actions.
+pub open spec fn can_enable<T>(next: ActionPred<T>, action_pred: ActionPred<T>) -> StatePred<T> {
+    enabled(action_compose(action_star(next), |s: T, s_prime: T| next(s, s_prime) && action_pred(s, s_prime)))
+}
+
+// Returns a temporal predicate that is satisfied
+// iff `always(eventually(lift_state(state_pred)))` getting satisfied implies `always(eventually(lift_action(action_pred)))` getting satisfied.
+//
+// It says whether the action happens *infinitely often* if the state predicate holds *infinitely often*.
+pub open spec fn generalized_strong_fairness<T>(state_pred: StatePred<T>, action_pred: ActionPred<T>) -> TempPred<T> {
+    always(eventually(lift_state(state_pred))).implies(always(eventually(lift_action(action_pred))))
+}
+
+// Returns a temporal predicate that is satisfied
+// iff `always(eventually(lift_state(enabled(action_pred))))` getting satisfied implies `always(eventually(lift_action(action_pred)))` getting satisfied.
+//
+// It says whether the action happens *infinitely often* if the action is enabled *infinitely often*.
+pub open spec fn strong_fairness<T>(action_pred: ActionPred<T>) -> TempPred<T> {
+    generalized_strong_fairness(enabled(action_pred), action_pred)
+}
+
+// Returns a temporal predicate that is satisfied
+// iff `always(eventually(lift_state(can_enable(next, action_pred))))` getting satisfied implies `always(eventually(lift_action(action_pred)))` getting satisfied.
+//
+// It says whether the action happens *infinitely often* if the system can enable the action *infinitely often*.
+// Unlike strong fairness, it applies even if the action never actually gets enabled.
+//
+// Defined in "Fairness and Hyperfairness" (Lamport, 2000).
+pub open spec fn hyperfairness<T>(next: ActionPred<T>, action_pred: ActionPred<T>) -> TempPred<T> {
+    generalized_strong_fairness(can_enable(next, action_pred), action_pred)
+}
+
 // `|=` for temporal predicates in TLA+.
 // Returns true iff `temp_pred` is satisfied by all possible executions (behaviors).
 //
