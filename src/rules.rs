@@ -2842,6 +2842,90 @@ proof fn leads_to_rank_step_one_usize_rec<T>(spec: TempPred<T>, p: spec_fn(usize
     }
 }
 
+// Returns true iff some element satisfying p has nothing strictly below it that satisfies p.
+// Here lt(d, c) says that d is strictly below c.
+pub open spec fn has_minimal<A>(lt: spec_fn(A, A) -> bool, p: spec_fn(A) -> bool) -> bool {
+    exists |m: A| #[trigger] p(m) && forall |d: A| lt(d, m) ==> !#[trigger] p(d)
+}
+
+// Returns true iff `lt` is well-founded, i.e., every satisfiable predicate has a minimal element.
+pub open spec fn well_founded<A>(lt: spec_fn(A, A) -> bool) -> bool {
+    forall |p: spec_fn(A) -> bool| (exists |c: A| #[trigger] p(c)) ==> #[trigger] has_minimal(lt, p)
+}
+
+// Prove well-foundedness by a ranking function to natural numbers.
+// pre:
+//     forall |d, c|, lt(d, c) ==> rank(d) < rank(c)
+// post:
+//     lt is well-founded
+pub proof fn well_founded_by_rank<A>(lt: spec_fn(A, A) -> bool, rank: spec_fn(A) -> nat)
+    requires forall |d: A, c: A| #[trigger] lt(d, c) ==> rank(d) < rank(c),
+    ensures well_founded(lt),
+{
+    assert forall |p: spec_fn(A) -> bool| (exists |c: A| #[trigger] p(c)) implies #[trigger] has_minimal(lt, p) by {
+        well_founded_by_rank_rec(lt, rank, p, choose |c: A| #[trigger] p(c));
+    }
+}
+
+proof fn well_founded_by_rank_rec<A>(lt: spec_fn(A, A) -> bool, rank: spec_fn(A) -> nat, p: spec_fn(A) -> bool, c: A)
+    requires
+        forall |d: A, c: A| #[trigger] lt(d, c) ==> rank(d) < rank(c),
+        p(c),
+    ensures has_minimal(lt, p),
+    decreases rank(c),
+{
+    if exists |d: A| lt(d, c) && #[trigger] p(d) {
+        well_founded_by_rank_rec(lt, rank, p, choose |d: A| lt(d, c) && #[trigger] p(d));
+    }
+}
+
+// The Lattice Rule from Figure 5 of "The Temporal Logic of Actions" (Lamport, 1994).
+// It generalizes leads_to_rank_step_one from counting down on natural numbers to any well-founded order.
+// pre:
+//     lt is well-founded
+//     forall |c|, spec |= h(c) ~> (g \/ exists |d| lt(d, c) /\ h(d))
+// post:
+//     forall |c|, spec |= h(c) ~> g
+//     spec |= (exists |c| h(c)) ~> g
+//
+// The premise says that from h(c) the system either reaches g or moves to h(d) for some d strictly below c.
+// The set S of the original rule is the type A here; to use a subset of A, restrict lt and h to that subset.
+pub proof fn leads_to_lattice<T, A>(spec: TempPred<T>, lt: spec_fn(A, A) -> bool, h: spec_fn(A) -> TempPred<T>, g: TempPred<T>)
+    requires
+        well_founded(lt),
+        forall |c: A| #![trigger h(c)] spec.entails(h(c).leads_to(g.or(tla_exists(|d: A| lift_state(|s: T| lt(d, c)).and(h(d)))))),
+    ensures
+        forall |c: A| #![trigger h(c)] spec.entails(h(c).leads_to(g)),
+        spec.entails(tla_exists(h).leads_to(g)),
+{
+    let bad = |c: A| !spec.entails(h(c).leads_to(g));
+    assert forall |c: A| #![trigger h(c)] spec.entails(h(c).leads_to(g)) by {
+        if bad(c) {
+            // Take a minimal counterexample m and show that it is not a counterexample.
+            assert(has_minimal(lt, bad));
+            let m = choose |m: A| #[trigger] bad(m) && forall |d: A| lt(d, m) ==> !#[trigger] bad(d);
+            let lower = |d: A| lift_state(|s: T| lt(d, m)).and(h(d));
+            assert forall |ex| #[trigger] spec.satisfied_by(ex) implies h(m).leads_to(g).satisfied_by(ex) by {
+                assert forall |i: nat| #[trigger] h(m).satisfied_by(ex.suffix(i)) implies eventually(g).satisfied_by(ex.suffix(i)) by {
+                    instantiate_entailed_leads_to_ex::<T>(ex, i, spec, h(m), g.or(tla_exists(lower)));
+                    let j = eventually_choose_witness_ex::<T>(ex.suffix(i), g.or(tla_exists(lower)));
+                    if !g.satisfied_by(ex.suffix(i).suffix(j)) {
+                        // The system moved to h(d) for some d strictly below m, and h(d) ~> g since d is not a counterexample.
+                        let d = tla_exists_choose_witness_ex::<T, A>(ex.suffix(i).suffix(j), lower);
+                        assert(lower(d).satisfied_by(ex.suffix(i).suffix(j)));
+                        assert(!bad(d));
+                        execution_equality::<T>(ex.suffix(i).suffix(j), ex.suffix(i + j));
+                        instantiate_entailed_leads_to_ex::<T>(ex, i + j, spec, h(d), g);
+                        let k = eventually_choose_witness_ex::<T>(ex.suffix(i + j), g);
+                        execution_equality::<T>(ex.suffix(i).suffix(j + k), ex.suffix(i + j).suffix(k));
+                    }
+                }
+            }
+        }
+    }
+    leads_to_exists_intro::<T, A>(spec, h, g);
+}
+
 // Prove monotinicity holds
 // This lemma help to prove precondition of iterative_esr
 // pre:
@@ -2996,65 +3080,13 @@ pub proof fn leads_to_by_borrowing_inv<T>(spec: TempPred<T>, p: TempPred<T>, q: 
     }
 }
 
-pub proof fn iterative_esr_rec<T>(spec: TempPred<T>, p: spec_fn(nat) -> TempPred<T>, q: spec_fn(nat) -> TempPred<T>, n: nat)
-    requires
-        forall |n| #![trigger p(n)] spec.entails(always(p(n)).leads_to(always(q(n)))),
-        forall |n| #![trigger p(n)] spec.entails(always(p(n).implies(always(tla_exists(|m: nat| lift_state(|s| m <= n).and(p(m))))))),
-        forall |n: nat| #![trigger p(n)] n > 0 ==> spec.entails(always(q(n)).leads_to(not(p(n)))),
-    ensures
-        spec.entails(p(n).leads_to(always(p(0)))),
-    decreases n
-{
-    assert forall |ex| #[trigger] spec.satisfied_by(ex) implies p(n).leads_to(always(p(0))).satisfied_by(ex) by {
-        assert forall |i| #[trigger] p(n).satisfied_by(ex.suffix(i)) implies eventually(always(p(0))).satisfied_by(ex.suffix(i)) by {
-            implies_apply_ex(ex, spec, always(p(n).implies(always(tla_exists(|m: nat| lift_state(|s| m <= n).and(p(m)))))));
-            implies_apply_ex(ex.suffix(i), p(n), always(tla_exists(|m: nat| lift_state(|s| m <= n).and(p(m)))));
-            assert(always(tla_exists(|m: nat| lift_state(|s| m <= n).and(p(m)))).satisfied_by(ex.suffix(i)));
-            if n == 0 {
-                assert (tla_exists(|m: nat| lift_state(|s| m <= 0).and(p(m))) == p(0)) by {
-                    assert forall |ex| #[trigger] p(0).satisfied_by(ex) implies tla_exists(|m: nat| lift_state(|s| m <= 0).and(p(m))).satisfied_by(ex) by {
-                        assert((|m: nat| lift_state(|s| m <= 0).and(p(m)))(0).satisfied_by(ex));
-                    }
-                    temp_pred_equality(tla_exists(|m: nat| lift_state(|s| m <= 0).and(p(m))), p(0));
-                }
-                assert(always(p(0)).satisfied_by(ex.suffix(i)));
-                execution_equality(ex.suffix(i), ex.suffix(i).suffix(0));
-                eventually_intro_by_witness_ex(ex.suffix(i), always(p(0)), 0);
-            } else {
-                if always(p(n)).satisfied_by(ex.suffix(i)) {
-                    leads_to_trans(spec, always(p(n)), always(q(n)), not(p(n)));
-                    implies_apply_ex(ex, spec, always(p(n)).leads_to(not(p(n))));
-                    implies_apply_ex(ex.suffix(i), always(p(n)), eventually(not(p(n))));
-                    assert(exists |m: nat| #![trigger p(m)] m < n && eventually(p(m)).satisfied_by(ex.suffix(i)));
-                } else {
-                    assert(exists |j| not(p(n)).satisfied_by(ex.suffix(i).suffix(j)));
-                    assert (exists |m: nat| #![trigger p(m)] m < n && eventually(p(m)).satisfied_by(ex.suffix(i))) by {
-                        let j = choose |j| not(p(n)).satisfied_by(ex.suffix(i).suffix(j));
-                        assert(tla_exists(|m: nat| lift_state(|s| m <= n).and(p(m))).satisfied_by(ex.suffix(i).suffix(j)));
-                        assert(exists |m: nat| #![trigger p(m)] m <= n && p(m).satisfied_by(ex.suffix(i).suffix(j)));
-                    }
-                }
-                let m = choose |m: nat| #![trigger p(m)] m < n && eventually(p(m)).satisfied_by(ex.suffix(i));
-                assert(eventually(p(m)).satisfied_by(ex.suffix(i)));
-                let j = eventually_choose_witness_ex(ex.suffix(i), p(m));
-                execution_equality(ex.suffix(i).suffix(j), ex.suffix(i+j));
-                iterative_esr_rec(spec, p, q, m);
-                implies_apply_ex(ex, spec, p(m).leads_to(always(p(0))));
-                implies_apply_ex(ex.suffix(i+j), p(m), eventually(always(p(0))));
-                let k = eventually_choose_witness_ex(ex.suffix(i+j), always(p(0)));
-                execution_equality(ex.suffix(i).suffix(j+k), ex.suffix(i+j).suffix(k));
-            }
-        }
-    }
-}
-
 // Prove leads to by monotonicity
 // pre:
 //      forall n. spec |= []p(n) ~> []q(n)
 //      forall n. spec |= [](p(n) ==> [](exists |m| m <= n /\ p(m))
 //      forall n. n > 0 ==> spec |= []q(n) ~> !p(n)
 // post:
-//      forall n. spec |= p(n) ~> []q(0)
+//      forall n. spec |= p(n) ~> []p(0)
 //
 // This lemma is used for reasoning about monotonic updates. Here p and q takes a ranking function (nat).
 // The first premise is ESR, the second premise says that the ranking for p never increases, and the third premise says
@@ -3068,9 +3100,47 @@ pub proof fn iterative_esr<T>(spec: TempPred<T>, p: spec_fn(nat) -> TempPred<T>,
     ensures
         forall |n| #![trigger p(n)] spec.entails(p(n).leads_to(always(p(0)))),
 {
-    assert forall |n| #[trigger] spec.entails(p(n).leads_to(always(p(0)))) by {
-        iterative_esr_rec(spec, p, q, n);
+    // Apply the Lattice Rule on natural numbers ordered by <, with h = p and g = []p(0).
+    let lt = |d: nat, c: nat| d < c;
+    let g = always(p(0));
+    well_founded_by_rank::<nat>(lt, |n: nat| n);
+    assert forall |c: nat| #![trigger p(c)] spec.entails(p(c).leads_to(g.or(tla_exists(|d: nat| lift_state(|s: T| lt(d, c)).and(p(d)))))) by {
+        let lower = |d: nat| lift_state(|s: T| lt(d, c)).and(p(d));
+        let below = |m: nat| lift_state(|s| m <= c).and(p(m));
+        assert forall |ex| #[trigger] spec.satisfied_by(ex) implies p(c).leads_to(g.or(tla_exists(lower))).satisfied_by(ex) by {
+            assert forall |i: nat| #[trigger] p(c).satisfied_by(ex.suffix(i)) implies eventually(g.or(tla_exists(lower))).satisfied_by(ex.suffix(i)) by {
+                instantiate_entailed_always_ex::<T>(ex, i, spec, p(c).implies(always(tla_exists(below))));
+                assert(always(tla_exists(below)).satisfied_by(ex.suffix(i)));
+                if c == 0 {
+                    // The ranking cannot go below 0, so p(0) holds from now on.
+                    assert forall |j: nat| #[trigger] p(0).satisfied_by(ex.suffix(i).suffix(j)) by {
+                        assert(tla_exists(below).satisfied_by(ex.suffix(i).suffix(j)));
+                        let m = tla_exists_choose_witness_ex::<T, nat>(ex.suffix(i).suffix(j), below);
+                        assert(below(m).satisfied_by(ex.suffix(i).suffix(j)));
+                    }
+                    execution_equality::<T>(ex.suffix(i), ex.suffix(i).suffix(0));
+                    eventually_intro_by_witness_ex::<T>(ex.suffix(i), g.or(tla_exists(lower)), 0);
+                } else if always(p(c)).satisfied_by(ex.suffix(i)) {
+                    // []p(c) ~> []q(c) ~> !p(c) contradicts []p(c).
+                    leads_to_trans(spec, always(p(c)), always(q(c)), not(p(c)));
+                    instantiate_entailed_leads_to_ex::<T>(ex, i, spec, always(p(c)), not(p(c)));
+                    let j = eventually_choose_witness_ex::<T>(ex.suffix(i), not(p(c)));
+                    assert(p(c).satisfied_by(ex.suffix(i).suffix(j)));
+                    assert(false);
+                } else {
+                    // p(c) fails at some point, and since the ranking never increases, p(m) holds there for some m < c.
+                    let j = choose |j: nat| !#[trigger] p(c).satisfied_by(ex.suffix(i).suffix(j));
+                    assert(tla_exists(below).satisfied_by(ex.suffix(i).suffix(j)));
+                    let m = tla_exists_choose_witness_ex::<T, nat>(ex.suffix(i).suffix(j), below);
+                    assert(below(m).satisfied_by(ex.suffix(i).suffix(j)));
+                    assert(lower(m).satisfied_by(ex.suffix(i).suffix(j)));
+                    tla_exists_intro_by_witness_ex::<T, nat>(ex.suffix(i).suffix(j), lower, m);
+                    eventually_intro_by_witness_ex::<T>(ex.suffix(i), g.or(tla_exists(lower)), j);
+                }
+            }
+        }
     }
+    leads_to_lattice::<T, nat>(spec, lt, p, g);
 }
 
 }
