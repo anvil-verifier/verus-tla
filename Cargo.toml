@@ -12,5 +12,9 @@ vstd = { git = "https://github.com/verus-lang/verus.git" }
 name = "mutex_example"
 path = "src/mutex_example.rs"
 
+[[bin]]
+name = "resource_version_example"
+path = "src/resource_version_example.rs"
+
 [package.metadata.verus]
 verify = true
